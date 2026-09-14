@@ -6,35 +6,55 @@
  * revue, puis d'en corriger au moins trois.
  */
 
-interface Item {
+// Nom pas  clair, item peut être toute chose
+interface Produit {
   name: string;
   price: number;
-  qty: number;
+  qantiterSelectionne: number;
 }
 
-const TAX_RATE = 0.2;
+// TAX_RATE == TVA
+const TVA = 0.2;
 
 // Calcule le total TTC du panier
-export function total(cart: Item[]): number {
-  let sum = 0;
-  for (const item of cart) {
-    sum += item.price * item.qty;
+// double responsabiliter appliquer le total du panier et la TVA 
+// Deux fonction
+export function totalPricePanierHT(listeProduits: Produit[]): number {
+  let total = 0;
+  for (const produit of listeProduits) {
+    if (produit.price <= 0 || produit.qantiterSelectionne <= 0):
+      throw Error("Price or produit negatif")
+    total += produit.price * produit.qantiterSelectionne;
   }
-  return sum + sum * TAX_RATE;
+  return total;
+}
+
+export function priceTTC(price: number): number{
+  return price + price * TVA
 }
 
 // Formate un prix en euros
-export function formatPrice(value: number): string {
-  return value.toFixed(2) + " €";
+export function formatPrice(price: number): string {
+  return price.toFixed(2) + " €";
 }
 
 // Encaisse le panier : affiche le total et prépare le paiement
-export function checkout(cart: Item[]) {
-  if (cart.length === 0) {
+
+// Double responsabilité, deux fonctions
+export function checkout(listeProduits: Produit[]) {
+  let price = calculPricePanierTTC(listeProduits);
+  if (price === 0) {
     console.log("Panier vide");
     return;
   }
-  const t = total(cart);
-  console.log("Total à payer : " + formatPrice(t));
+  console.log("Total à payer : " + formatPrice(price));
   // TODO: intégrer le paiement
+}
+
+export function calculPricePanierTTC(listeProduits: Produit[]) : number{
+    if (listeProduits.length === 0) {
+    return 0;
+  }
+  const totalHT = totalPricePanierHT(listeProduits);
+  return priceTTC(totalHT);
 }
