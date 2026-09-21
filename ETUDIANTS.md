@@ -14,7 +14,7 @@
 
 ## 1. Identification de l'équipe
 
-- **Préfixe :** `<année>-<etablissement>-<groupe>` — ex. `2026-IUT-BUT3-DUPONT`
+- **Préfixe :** `2026-IUT-BUT3-BARRAT`
   - `année` = `2026`
   - `etablissement` = `IUT-BUT3`
   - `groupe` = BARRAT, 
