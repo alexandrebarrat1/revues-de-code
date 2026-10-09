@@ -8,6 +8,9 @@
 // and the two sync methods are gone: PrismaClient reads/writes plain objects
 // and there is exactly one representation of each field.
 
+/**
+ * Modèle de domaine Product — Gestion des produits, stocks, prix et remises.
+ */
 import { PrismaClient, Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
