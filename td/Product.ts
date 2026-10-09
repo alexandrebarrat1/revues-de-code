@@ -310,9 +310,10 @@ export class Product {
     });
 
     // Notify all regional suppliers
-    for (const [, supplier] of this.suppliersRegions) {
-      this.notifications.push(this.createNotification(supplier.email, `Product sold: ${this.name}`, `${quantity} unit(s) of ${this.name} were sold. Remaining stock: ${this.stock}.`));
-    }
+    this.notifyRegionalSuppliers(
+      `Product sold: ${this.name}`,
+      `${quantity} unit(s) of ${this.name} were sold. Remaining stock: ${this.stock}.`
+    );
   }
 
   // --- Lifecycle ---
@@ -328,12 +329,19 @@ export class Product {
     });
 
     // Notify all regional suppliers
-    for (const [, supplier] of this.suppliersRegions) {
-      this.notifications.push(this.createNotification(supplier.email, `Product deprecated: ${this.name}`, `The product ${this.name} has been deprecated and removed from the catalog.`));
-    }
+    this.notifyRegionalSuppliers(
+      `Product deprecated: ${this.name}`,
+      `The product ${this.name} has been deprecated and removed from the catalog.`
+    );
 
     // Notify customers
     this.notifications.push(this.createNotification("customers@omniproduct.com", `Product no longer available: ${this.name}`, `${this.name} is no longer available.`));
+  }
+
+  private notifyRegionalSuppliers(subject: string, body: string): void {
+    for (const [, supplier] of this.suppliersRegions) {
+      this.notifications.push(this.createNotification(supplier.email, subject, body));
+    }
   }
 
   // small helper to cut down repetition in notif building
