@@ -75,6 +75,8 @@ export interface Notification {
 }
 
 export class Supplier {
+  static readonly EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   constructor(
     public id: string,
     public name: string,
@@ -176,50 +178,55 @@ export class Product {
   // --- Catalog / images / discounts ---
 
   async addImage(context: string, url: string): Promise<void> {
-    if (url) {
-      if (url.substring(0, 4) === "http") {
-        if (!(this.images[context] === undefined)) {
-          let imageKey = context;
-          for (const [, supplier] of this.suppliersRegions) {
-            if (supplier.region) {
-              if (supplier.email) {
-                if (supplier.email.indexOf("@") > 0 && supplier.email.indexOf(".", supplier.email.indexOf("@")) > supplier.email.indexOf("@")) {
-                  imageKey = context + "-" + supplier.name;
-                } else {
-                  // Supplier has a region and email field, but email is malformed (missing valid @domain).
-                  // Treat as a data integrity error: throw instead of gracefully degrading.
-                  throw new MalformedSupplierEmailError(supplier.name, supplier.email);
-                }
-              } else {
-                // Supplier has a region but NO email field (empty string, falsy).
-                // Fall back to generic "-supplier" marker, losing the supplier's identity.
-                imageKey = context + "-supplier";
-              }
-            } else {
-              // Supplier has NO region at all (empty string, null, undefined).
-              // Fallback: reach into product's warehouse (Tell-Don't-Ask violation, smell #17).
-              // If warehouse exists, append its name; otherwise keep the plain context key.
-              imageKey = this.warehouse ? context + "-" + this.warehouse.name : context;
-            }
-          }
-          this.images[imageKey] = url;
-        } else {
-          this.images[context] = url;
-        }
-        this.updatedAt = new Date();
-        await prisma.product.update({
-          where: { id: this.id },
-          data: { images: this.images as Prisma.InputJsonValue, updatedAt: this.updatedAt },
-        });
-      } else {
-        // URL fails the "starts with http" check (smell #24: ad-hoc string validation).
-        throw new InvalidImageUrlError();
-      }
-    } else {
-      // URL is falsy (empty string, null, undefined).
-      // Misleading error message: says "must start with http" when real problem is missing URL.
-      throw new InvalidImageUrlError();
+    if (!url) {
+      throw new InvalidImageUrlError("url is required");
     }
+    if (!this.isValidHttpUrl(url)) {
+      throw new InvalidImageUrlError("url must be a valid HTTP or HTTPS URL");
+    }
+
+    if (this.images[context] === undefined) {
+      this.images[context] = url;
+      this.updatedAt = new Date();
+      await prisma.product.update({
+        where: { id: this.id },
+        data: { images: this.images as Prisma.InputJsonValue, updatedAt: this.updatedAt },
+      });
+      return;
+    }
+
+    let imageKey = context;
+    for (const [, supplier] of this.suppliersRegions) {
+      if (supplier.region) {
+        if (supplier.email) {
+          if (!Supplier.EMAIL_REGEX.test(supplier.email)) {
+            throw new MalformedSupplierEmailError(supplier.name, supplier.email);
+          }
+          imageKey = `${context}-${supplier.name}`;
+        } else {
+          imageKey = `${context}-supplier`;
+        }
+      } else {
+        imageKey = this.warehouse ? `${context}-${this.warehouse.name}` : context;
+      }
+      break;
+    }
+
+    this.images[imageKey] = url;
+    this.updatedAt = new Date();
+    await prisma.product.update({
+      where: { id: this.id },
+      data: { images: this.images as Prisma.InputJsonValue, updatedAt: this.updatedAt },
+    });
+  }
+
+  private isValidHttpUrl(urlString: string): boolean {
+    try {
+      const parsedUrl = new URL(urlString);
+      return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+    } catch {
+      return false;
+  }
   }
 
   getValidUntil(): Date | null {
