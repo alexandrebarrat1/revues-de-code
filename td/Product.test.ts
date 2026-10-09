@@ -367,8 +367,22 @@ describe("addImage()", () => {
     const product = makeTypedProduct();
 
     await expect(product.addImage("hero", "ftp://img/hero.png")).rejects.toThrow(
-      "url must start with http",
+      "url must be a valid HTTP or HTTPS URL",
     );
+  });
+
+  it("rejects a missing url with a specific error", async () => {
+    const product = makeTypedProduct();
+
+    await expect(product.addImage("hero", "")).rejects.toThrow("url is required");
+  });
+
+  it("accepts an uppercase HTTP scheme", async () => {
+    const product = makeTypedProduct();
+
+    await product.addImage("hero", "HTTP://img/hero.png");
+
+    expect(product.images.hero).toBe("HTTP://img/hero.png");
   });
 
   it("appends the supplier name to the context key when overwriting an existing image", async () => {
@@ -446,6 +460,17 @@ describe("addImage()", () => {
     await expect(product.addImage("hero", "http://img/hero-v2.png")).rejects.toThrow(
       "Supplier Acme Corp has a malformed email: not-an-email",
     );
+  });
+
+  it("uses the first registered supplier when multiple suppliers exist", async () => {
+    const product = makeTypedProduct();
+    product.suppliersRegions.set("EU", new Supplier("s1", "Acme Corp", "acme@example.com", "EU"));
+    product.suppliersRegions.set("US", new Supplier("s2", "Beta LLC", "beta@example.com", "US"));
+    await product.addImage("hero", "http://img/hero-v1.png");
+
+    await product.addImage("hero", "http://img/hero-v2.png");
+
+    expect(product.images["hero-Acme Corp"]).toBe("http://img/hero-v2.png");
   });
 });
 
