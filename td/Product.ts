@@ -300,6 +300,28 @@ export class Product {
 
   // --- Suppliers ---
 
+  /**
+   * Hydrates the in-memory region map from the product-supplier join table.
+   * After a successful load, the map contains exactly the suppliers linked
+   * to this product in persistence.
+   */
+  async loadSuppliersFromDb(): Promise<void> {
+    const supplierLinks = await prisma.productSupplier.findMany({
+      where: { productId: this.id },
+      include: {
+        supplier: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    this.suppliersRegions.clear();
+    for (const link of supplierLinks) {
+      const { id, name, email } = link.supplier;
+      this.suppliersRegions.set(link.region, new Supplier(id, name, email, link.region));
+    }
+  }
+
   async addSupplierToRegion(region: string, suppliers: Supplier[]): Promise<void> {
     const supplier = suppliers.find((candidate) => candidate.region === region);
     if (!supplier) throw new SupplierNotFoundError(region);

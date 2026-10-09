@@ -21,7 +21,17 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("@prisma/client", () => ({
   PrismaClient: vi.fn().mockImplementation(function (this: any) {
     this.product = { update: vi.fn().mockResolvedValue(undefined) };
-    this.productSupplier = { upsert: vi.fn().mockResolvedValue(undefined) };
+    this.productSupplier = {
+      upsert: vi.fn().mockResolvedValue(undefined),
+      findMany: vi.fn().mockResolvedValue([
+        {
+          productId: "p1",
+          supplierId: "s1",
+          region: "EU",
+          supplier: { id: "s1", name: "Acme Corp", email: "acme@example.com" },
+        },
+      ]),
+    };
   }),
   Prisma: {},
 }));
@@ -516,6 +526,21 @@ describe("addImage()", () => {
 });
 
 describe("addSupplierToRegion()", () => {
+  it("hydrates the regional supplier map from its join-table representation", async () => {
+    const product = makeTypedProduct();
+    product.suppliersRegions.set(
+      "stale",
+      new Supplier("old", "Old Supplier", "old@example.com", "stale"),
+    );
+
+    await product.loadSuppliersFromDb();
+
+    expect(product.suppliersRegions.size).toBe(1);
+    expect(product.suppliersRegions.get("EU")).toEqual(
+      new Supplier("s1", "Acme Corp", "acme@example.com", "EU"),
+    );
+  });
+
   it("assigns the matching supplier to its region", async () => {
     const product = makeTypedProduct();
     const supplier = new Supplier("s1", "Acme Corp", "acme@example.com", "EU");
