@@ -195,6 +195,21 @@ export class Product {
       return;
     }
 
+    const imageKey = this.resolveImageKey(context);
+    this.images[imageKey] = url;
+    this.updatedAt = new Date();
+    await prisma.product.update({
+      where: { id: this.id },
+      data: { images: this.images as Prisma.InputJsonValue, updatedAt: this.updatedAt },
+    });
+  }
+
+  /**
+   * Image-key fallback policy: use the first registered supplier; add its name
+   * when it has a valid email, use a generic suffix when it has no email, and
+   * use the warehouse name (or the unchanged context) when it has no region.
+   */
+  private resolveImageKey(context: string): string {
     let imageKey = context;
     for (const [, supplier] of this.suppliersRegions) {
       if (supplier.region) {
@@ -211,13 +226,7 @@ export class Product {
       }
       break;
     }
-
-    this.images[imageKey] = url;
-    this.updatedAt = new Date();
-    await prisma.product.update({
-      where: { id: this.id },
-      data: { images: this.images as Prisma.InputJsonValue, updatedAt: this.updatedAt },
-    });
+    return imageKey;
   }
 
   private isValidHttpUrl(urlString: string): boolean {
