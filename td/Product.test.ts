@@ -65,6 +65,12 @@ describe("Supplier", () => {
     expect(hasProp(supplier, "region"), "Supplier's 4th constructor param should be exposed as `region` (not an abbreviation)").toBe(true);
     expect(supplier.region).toBe("EU");
   });
+
+  it("returns the unchanged image context when it has no region", () => {
+    const supplier = new Supplier("s1", "Acme Corp", "acme@example.com", "");
+
+    expect(supplier.getDisambiguationKey("hero")).toBe("hero");
+  });
 });
 
 describe("Warehouse", () => {
@@ -213,6 +219,16 @@ describe("Product.getResellerPrice()", () => {
   });
 });
 
+describe("setMargin()", () => {
+  it("updates the margin on its Price collaborator", async () => {
+    const product = makeTypedProduct();
+
+    await product.setMargin(12);
+
+    expect(product.price.margin).toBe(12);
+  });
+});
+
 describe("getDisplayLabel()", () => {
   it("prefixes discontinued products", () => {
     const product = makeTypedProduct();
@@ -236,6 +252,14 @@ describe("getDisplayLabel()", () => {
 });
 
 describe("receiveStock()", () => {
+  it("restocks without a warehouse location", async () => {
+    const product = makeTypedProduct();
+
+    await product.receiveStock(1);
+
+    expect(product.stock).toBe(101);
+  });
+
   it("increases both stock and quantity by the received amount", async () => {
     const product = makeTypedProduct();
     product.warehouse = new Warehouse("w1", "Main Depot", "1 Dock Rd", "EU");
@@ -377,6 +401,14 @@ describe("addImage()", () => {
     await expect(product.addImage("hero", "")).rejects.toThrow("url is required");
   });
 
+  it("rejects a malformed url", async () => {
+    const product = makeTypedProduct();
+
+    await expect(product.addImage("hero", "not a url")).rejects.toThrow(
+      "url must be a valid HTTP or HTTPS URL",
+    );
+  });
+
   it("accepts an uppercase HTTP scheme", async () => {
     const product = makeTypedProduct();
 
@@ -394,6 +426,15 @@ describe("addImage()", () => {
 
     expect(product.images["hero-Acme Corp"]).toBe("http://img/hero-v2.png");
     expect(product.images["hero"]).toBe("http://img/hero-v1.png");
+  });
+
+  it("replaces the context image when no supplier is registered", async () => {
+    const product = makeTypedProduct();
+    await product.addImage("hero", "http://img/hero-v1.png");
+
+    await product.addImage("hero", "http://img/hero-v2.png");
+
+    expect(product.images.hero).toBe("http://img/hero-v2.png");
   });
 
   it("falls back to a generic '-supplier' suffix when the supplier has no email", async () => {

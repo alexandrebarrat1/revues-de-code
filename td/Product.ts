@@ -74,6 +74,24 @@ export interface Notification {
   productId?: string;
 }
 
+function createNotification(
+  recipient: string,
+  subject: string,
+  body: string,
+  channel: Channel,
+  productId?: string,
+): Notification {
+  return {
+    id: crypto.randomUUID(),
+    recipient,
+    subject,
+    body,
+    channel,
+    sentAt: new Date(),
+    productId,
+  };
+}
+
 export class Supplier {
   static readonly EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -83,6 +101,23 @@ export class Supplier {
     public email: string,
     public region: string,
   ) {}
+
+  hasRegion(): boolean {
+    return Boolean(this.region);
+  }
+
+  getDisambiguationKey(context: string): string {
+    if (!this.hasRegion()) return context;
+    if (!this.email) return `${context}-supplier`;
+    if (!Supplier.EMAIL_REGEX.test(this.email)) {
+      throw new MalformedSupplierEmailError(this.name, this.email);
+    }
+    return `${context}-${this.name}`;
+  }
+
+  createNotification(subject: string, body: string, productId: string): Notification {
+    return createNotification(this.email, subject, body, "email", productId);
+  }
 }
 
 export class Warehouse {
@@ -92,6 +127,14 @@ export class Warehouse {
     public address: string,
     public region: string,
   ) {}
+
+  getLocationSuffix(): string {
+    return ` at ${this.name}`;
+  }
+
+  getDisambiguationKey(context: string): string {
+    return `${context}-${this.name}`;
+  }
 }
 
 export class Price {
@@ -210,23 +253,15 @@ export class Product {
    * use the warehouse name (or the unchanged context) when it has no region.
    */
   private resolveImageKey(context: string): string {
-    let imageKey = context;
-    for (const [, supplier] of this.suppliersRegions) {
-      if (supplier.region) {
-        if (supplier.email) {
-          if (!Supplier.EMAIL_REGEX.test(supplier.email)) {
-            throw new MalformedSupplierEmailError(supplier.name, supplier.email);
-          }
-          imageKey = `${context}-${supplier.name}`;
-        } else {
-          imageKey = `${context}-supplier`;
-        }
-      } else {
-        imageKey = this.warehouse ? `${context}-${this.warehouse.name}` : context;
+    for (const supplier of this.suppliersRegions.values()) {
+      if (supplier.hasRegion()) {
+        return supplier.getDisambiguationKey(context);
       }
-      break;
+      return this.warehouse
+        ? this.warehouse.getDisambiguationKey(context)
+        : context;
     }
-    return imageKey;
+    return context;
   }
 
   private isValidHttpUrl(urlString: string): boolean {
@@ -300,8 +335,8 @@ export class Product {
     this.stock += quantity;
     this.quantity += quantity;
     this.updatedAt = new Date();
-    const warehouseName = this.warehouse ? " at " + this.warehouse.name : "";
-    console.log("Restocking " + this.name + warehouseName);
+    const warehouseLocation = this.warehouse?.getLocationSuffix() ?? "";
+    console.log(`Restocking ${this.name}${warehouseLocation}`);
     await prisma.product.update({
       where: { id: this.id },
       data: { stock: this.stock, quantity: this.quantity, updatedAt: this.updatedAt },
@@ -353,21 +388,13 @@ export class Product {
   }
 
   private notifyRegionalSuppliers(subject: string, body: string): void {
-    for (const [, supplier] of this.suppliersRegions) {
-      this.notifications.push(this.createNotification(supplier.email, subject, body));
+    for (const supplier of this.suppliersRegions.values()) {
+      this.notifications.push(supplier.createNotification(subject, body, this.id));
     }
   }
 
   // small helper to cut down repetition in notif building
   private createNotification(recipient: string, subject: string, body: string): Notification {
-    return {
-      id: crypto.randomUUID(),
-      recipient,
-      subject,
-      body,
-      channel: "email",
-      sentAt: new Date(),
-      productId: this.id,
-    };
+    return createNotification(recipient, subject, body, "email", this.id);
   }
 }
