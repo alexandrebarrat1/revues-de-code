@@ -89,8 +89,6 @@ export class Product {
   updatedAt: Date;
   notifications: Notification[] = [];
   validUntil: Date | null = null;
-  nextStatus: ProductStatus | undefined;
-  discountSnapshot: string[] | undefined;
 
   constructor(
     id: string,
