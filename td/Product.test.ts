@@ -242,7 +242,7 @@ describe("setMargin()", () => {
 describe("getDisplayLabel()", () => {
   it("prefixes discontinued products", () => {
     const product = makeTypedProduct();
-    product.status = "deprecated";
+    product.transitionTo("deprecated");
 
     expect(product.getDisplayLabel()).toBe("[DISCONTINUED] Wireless Mouse");
   });
@@ -335,6 +335,52 @@ describe("deprecate()", () => {
 
     // 1 supplier notification + 1 customer notification
     expect(product.notifications.length).toBe(2);
+  });
+});
+
+describe("status transitions", () => {
+  it("keeps the current state when asked to transition to itself", () => {
+    const product = makeTypedProduct();
+
+    product.transitionTo("active");
+
+    expect(product.status).toBe("active");
+  });
+
+  it("rejects selling a deprecated product", async () => {
+    const product = makeTypedProduct();
+    await product.deprecate();
+
+    await expect(product.sell(1)).rejects.toThrow(
+      "Cannot operate on deprecated product: Wireless Mouse",
+    );
+  });
+
+  it("rejects transitioning from deprecated back to active", async () => {
+    const product = makeTypedProduct();
+    await product.deprecate();
+
+    expect(() => product.transitionTo("active")).toThrow(
+      "Cannot transition product status from deprecated to active",
+    );
+  });
+
+  it("reactivates an out-of-stock product when stock is received", async () => {
+    const product = makeTypedProduct();
+    await product.sell(100);
+
+    await product.receiveStock(1);
+
+    expect(product.status).toBe("active");
+  });
+
+  it("rejects receiving stock for a deprecated product", async () => {
+    const product = makeTypedProduct();
+    await product.deprecate();
+
+    await expect(product.receiveStock(1)).rejects.toThrow(
+      "Cannot operate on deprecated product: Wireless Mouse",
+    );
   });
 });
 
