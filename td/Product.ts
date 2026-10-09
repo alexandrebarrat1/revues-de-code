@@ -15,6 +15,48 @@ import { PrismaClient, Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+export class InsufficientStockError extends Error {
+  constructor(message = "Not enough stock") {
+    super(message);
+    this.name = "InsufficientStockError";
+  }
+}
+
+export class MaxDiscountsExceededError extends Error {
+  constructor(message = "Cannot have more than 2 discounts at the same time") {
+    super(message);
+    this.name = "MaxDiscountsExceededError";
+  }
+}
+
+export class InvalidDiscountDateError extends Error {
+  constructor(message = "validUntil cannot be in the past") {
+    super(message);
+    this.name = "InvalidDiscountDateError";
+  }
+}
+
+export class SupplierNotFoundError extends Error {
+  constructor(region: string) {
+    super("No supplier found for region " + region);
+    this.name = "SupplierNotFoundError";
+  }
+}
+
+export class MalformedSupplierEmailError extends Error {
+  constructor(supplierName: string, email: string) {
+    super("Supplier " + supplierName + " has a malformed email: " + email);
+    this.name = "MalformedSupplierEmailError";
+  }
+}
+
+export class InvalidImageUrlError extends Error {
+  constructor(message = "url must start with http") {
+    super(message);
+    this.name = "InvalidImageUrlError";
+  }
+}
+
 export type Channel = "email" | "sms" | "push";
 export type ProductStatus = "active" | "out_of_stock" | "deprecated";
 
@@ -146,7 +188,7 @@ export class Product {
                 } else {
                   // Supplier has a region and email field, but email is malformed (missing valid @domain).
                   // Treat as a data integrity error: throw instead of gracefully degrading.
-                  throw new Error(`Supplier ${supplier.name} has a malformed email: ${supplier.email}`);
+                  throw new MalformedSupplierEmailError(supplier.name, supplier.email);
                 }
               } else {
                 // Supplier has a region but NO email field (empty string, falsy).
@@ -171,12 +213,12 @@ export class Product {
         });
       } else {
         // URL fails the "starts with http" check (smell #24: ad-hoc string validation).
-        throw new Error("url must start with http");
+        throw new InvalidImageUrlError();
       }
     } else {
       // URL is falsy (empty string, null, undefined).
       // Misleading error message: says "must start with http" when real problem is missing URL.
-      throw new Error("url must start with http");
+      throw new InvalidImageUrlError();
     }
   }
 
@@ -190,10 +232,10 @@ export class Product {
 
   async addDiscount(discountCode: string, validUntil: Date): Promise<void> {
     if (validUntil < new Date()) {
-      throw new Error("validUntil cannot be in the past");
+      throw new InvalidDiscountDateError();
     }
     if (this.discounts.length >= MAX_DISCOUNTS_COUNT) {
-      throw new Error("Cannot have more than 2 discounts at the same time");
+      throw new MaxDiscountsExceededError();
     }
 
     this.discounts.push(discountCode);
@@ -209,7 +251,7 @@ export class Product {
 
   async addSupplierToRegion(region: string, suppliers: Supplier[]): Promise<void> {
     const supplier = suppliers.find((candidate) => candidate.region === region);
-    if (!supplier) throw new Error(`No supplier found for region ${region}`);
+    if (!supplier) throw new SupplierNotFoundError(region);
 
     this.suppliersRegions.set(region, supplier);
     this.updatedAt = new Date();
@@ -253,7 +295,7 @@ export class Product {
   }
 
   async sell(quantity: number): Promise<void> {
-    if (this.stock < quantity) throw new Error("Not enough stock");
+    if (this.stock < quantity) throw new InsufficientStockError();
 
     this.stock -= quantity;
     this.updatedAt = new Date();
