@@ -352,6 +352,24 @@ describe("deprecate()", () => {
   });
 });
 
+describe("flushNotifications()", () => {
+  it("returns and clears accumulated notifications", async () => {
+    const product = makeTypedProduct();
+    product.suppliersRegions.set(
+      "EU",
+      new Supplier("s1", "Acme Corp", "acme@example.com", "EU"),
+    );
+    await product.sell(1);
+
+    expect(product.notifications).toHaveLength(1);
+
+    const flushedNotifications = product.flushNotifications();
+
+    expect(flushedNotifications).toHaveLength(1);
+    expect(product.notifications).toHaveLength(0);
+  });
+});
+
 describe("status transitions", () => {
   it("keeps the current state when asked to transition to itself", () => {
     const product = makeTypedProduct();

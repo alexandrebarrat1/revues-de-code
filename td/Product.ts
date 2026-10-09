@@ -228,6 +228,12 @@ export class Product {
     this.updatedAt = new Date();
   }
 
+  flushNotifications(): Notification[] {
+    const pendingNotifications = [...this.notifications];
+    this.notifications = [];
+    return pendingNotifications;
+  }
+
   get status(): ProductStatus {
     return this.currentStatus;
   }
