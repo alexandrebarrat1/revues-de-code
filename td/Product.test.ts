@@ -36,7 +36,7 @@ vi.mock("@prisma/client", () => ({
   Prisma: {},
 }));
 
-import { Product, Price, Supplier, Warehouse } from "./Product";
+import { Product, Price, Supplier, Warehouse, prisma } from "./Product";
 
 function hasProp(obj: unknown, propName: string): boolean {
   return typeof obj === "object" && obj !== null && propName in (obj as object);
@@ -304,6 +304,20 @@ describe("sell()", () => {
 
     await expect(product.sell(101)).rejects.toThrow("Not enough stock");
     expect(product.stock).toBe(100);
+  });
+
+  it("keeps in-memory state unchanged when persistence fails", async () => {
+    const product = makeTypedProduct();
+    const previousUpdatedAt = product.updatedAt;
+    vi.spyOn(prisma.product, "update").mockRejectedValueOnce(
+      new Error("DB Connection Error"),
+    );
+
+    await expect(product.sell(10)).rejects.toThrow("DB Connection Error");
+
+    expect(product.stock).toBe(100);
+    expect(product.status).toBe("active");
+    expect(product.updatedAt).toBe(previousUpdatedAt);
   });
 
   it("pushes one notification per regional supplier", async () => {
