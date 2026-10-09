@@ -36,7 +36,14 @@ vi.mock("@prisma/client", () => ({
   Prisma: {},
 }));
 
-import { Product, Price, Supplier, Warehouse, prisma } from "./Product";
+import {
+  Product,
+  Price,
+  Supplier,
+  Warehouse,
+  NotificationService,
+  prisma,
+} from "./Product";
 
 function hasProp(obj: unknown, propName: string): boolean {
   return typeof obj === "object" && obj !== null && propName in (obj as object);
@@ -367,6 +374,19 @@ describe("flushNotifications()", () => {
 
     expect(flushedNotifications).toHaveLength(1);
     expect(product.notifications).toHaveLength(0);
+  });
+});
+
+describe("NotificationService", () => {
+  it("creates sale notifications independently of Product", () => {
+    const notificationService = new NotificationService();
+    const supplier = new Supplier("s1", "Acme Corp", "acme@example.com", "EU");
+
+    notificationService.notifyProductSold("Wireless Mouse", "p1", 2, 8, [supplier]);
+
+    expect(notificationService.notifications).toHaveLength(1);
+    expect(notificationService.notifications[0].recipient).toBe("acme@example.com");
+    expect(notificationService.notifications[0].subject).toBe("Product sold: Wireless Mouse");
   });
 });
 
